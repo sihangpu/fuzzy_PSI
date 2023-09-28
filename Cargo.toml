@@ -1,0 +1,10 @@
+[package]
+name = "f_psi"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+curve25519-dalek = {version = "4", features = ["rand_core", "digest"]}
+rand = "0.8"
