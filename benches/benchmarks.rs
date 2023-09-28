@@ -1,41 +1,35 @@
 #![feature(test)]
-
 extern crate test;
+
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::RistrettoPoint;
+
 use rand::rngs::OsRng;
+use std::collections::HashMap;
 
-fn fibonacci_u64(number: u64) -> u64 {
-    let mut last: u64 = 1;
-    let mut current: u64 = 0;
-    let mut buffer: u64;
-    let mut position: u64 = 1;
-
-    return loop {
-        if position == number {
-            break current;
-        }
-
-        buffer = last;
-        last = current;
-        current = buffer + current;
-        position += 1;
-    };
-}
+extern crate f_psi;
+use f_psi::okvs;
 
 #[cfg(test)]
+#[allow(unused_variables)]
 mod tests {
     use super::*;
     use test::Bencher;
 
     #[test]
-    fn it_works() {
-        assert_eq!(fibonacci_u64(1), 0);
-        assert_eq!(fibonacci_u64(2), 1);
-        assert_eq!(fibonacci_u64(12), 89);
-        assert_eq!(fibonacci_u64(30), 514229);
+    fn okvs_works() {
+        let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
+        let n = 100;
+        for j in 0..n {
+            list.insert(j, RISTRETTO_BASEPOINT_POINT);
+        }
+        let m = (n as f64 * (1.0 + okvs::EPSILON)).ceil() as u64;
+        let encoding = okvs::okvs_encode(&list);
+        let decoding = okvs::okvs_decode(&encoding, 1);
+        assert_eq!(encoding.len(), m as usize);
+        assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
     }
 
     #[bench]
