@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-curve25519-dalek = {version = "4", features = ["rand_core", "digest"]}
+curve25519-dalek = {version = "4", features = ["rand_core", "digest", "serde"]}
 rand = "0.8"
+fxhash = "0.2"
