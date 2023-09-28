@@ -3,8 +3,8 @@
 extern crate test;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::RistrettoPoint;
 use rand::rngs::OsRng;
 
 fn fibonacci_u64(number: u64) -> u64 {
@@ -20,7 +20,7 @@ fn fibonacci_u64(number: u64) -> u64 {
 
         buffer = last;
         last = current;
-        current = buffer + current; 
+        current = buffer + current;
         position += 1;
     };
 }
@@ -32,10 +32,10 @@ mod tests {
 
     #[test]
     fn it_works() {
-       assert_eq!(fibonacci_u64(1), 0); 
-       assert_eq!(fibonacci_u64(2), 1); 
-       assert_eq!(fibonacci_u64(12), 89); 
-       assert_eq!(fibonacci_u64(30), 514229); 
+        assert_eq!(fibonacci_u64(1), 0);
+        assert_eq!(fibonacci_u64(2), 1);
+        assert_eq!(fibonacci_u64(12), 89);
+        assert_eq!(fibonacci_u64(30), 514229);
     }
 
     #[bench]
@@ -64,4 +64,3 @@ mod tests {
         });
     }
 }
-
