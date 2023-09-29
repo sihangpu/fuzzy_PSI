@@ -66,7 +66,10 @@ mod tests {
         test::black_box(okvsmod.encode(&list));
 
         let elapsed = now.elapsed();
-        println!("{} items, Elapsed Enc: {:.2?}", N, elapsed);
+        println!(
+            "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
+            N, elapsed
+        );
         let decoding = okvsmod.decode(39);
         assert_eq!(
             decoding,
@@ -160,7 +163,7 @@ mod tests {
     //     });
     // }
 
-    // fn scalar_fp(s: &Scalar, t: &Scalar, N: usize) {
+    // fn scalar_fp(s: &Scalar, t: &Scalar) {
     //     let mut r = Scalar::ZERO;
     //     for _ in 0..N {
     //         r = s.invert();
@@ -175,8 +178,8 @@ mod tests {
     //     let scalar2 = Scalar::from(7u64);
     //     b.iter(|| {
     //         // test::black_box(&scalar1.invert());
-    //         test::black_box(scalar1 == Scalar::ZERO);
-    //         // test::black_box(scalar_fp(&scalar1, &scalar2, 2000));
+    //         // test::black_box(scalar1 == Scalar::ZERO);
+    //         test::black_box(scalar_fp(&scalar1, &scalar2));
     //     });
     // }
 
