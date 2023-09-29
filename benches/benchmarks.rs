@@ -40,25 +40,25 @@ mod tests {
     // #[test]
     // fn gbf_test() {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let n = 100;
-    //     for j in 0..n {
+    //     let N = 100;
+    //     for j in 0..N {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(n);
+    //     let mut gbf = okvs::GBF::new(N);
     //     gbf.encode(&list);
     //     let decoding = gbf.decode(12);
     //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
     // }
 
-    const n: u64 = 4000;
+    const N: u64 = 2000;
 
     #[test]
     fn okvs_test() {
         let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
-        for j in 0..n {
+        for j in 0..N {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
-        let mut okvsmod = okvs::OKVS::new(n);
+        let mut okvsmod = okvs::OKVS::new(N);
 
         let now = Instant::now();
 
@@ -77,10 +77,10 @@ mod tests {
     fn bench_okvs_encode(b: &mut Bencher) {
         let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
 
-        for j in 0..n {
+        for j in 0..N {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
-        let mut okvsmod = okvs::OKVS::new(n);
+        let mut okvsmod = okvs::OKVS::new(N);
         b.iter(|| {
             test::black_box(okvsmod.encode(&list));
         });
@@ -89,10 +89,10 @@ mod tests {
     fn bench_okvs_decode(b: &mut Bencher) {
         let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
 
-        for j in 0..n {
+        for j in 0..N {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
-        let mut okvsmod = okvs::OKVS::new(n);
+        let mut okvsmod = okvs::OKVS::new(N);
         okvsmod.encode(&list);
         b.iter(|| {
             test::black_box(okvsmod.decode(39));
@@ -102,11 +102,11 @@ mod tests {
     // #[bench]
     // fn bench_gbf_encode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let n = 2000;
-    //     for j in 0..n {
+    //     let N = 2000;
+    //     for j in 0..N {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(n);
+    //     let mut gbf = okvs::GBF::new(N);
     //     b.iter(|| {
     //         test::black_box(gbf.encode(&list));
     //     });
@@ -114,19 +114,19 @@ mod tests {
     // #[bench]
     // fn bench_gbf_decode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let n = 2000;
-    //     for j in 0..n {
+    //     let N = 2000;
+    //     for j in 0..N {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(n);
+    //     let mut gbf = okvs::GBF::new(N);
     //     b.iter(|| {
     //         test::black_box(gbf.decode(8));
     //     });
     // }
 
-    // fn add_n(p1: &RistrettoPoint, p2: &RistrettoPoint, n: usize) -> RistrettoPoint {
+    // fn add_n(p1: &RistrettoPoint, p2: &RistrettoPoint, N: usize) -> RistrettoPoint {
     //     let mut p: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
-    //     for _ in 0..n {
+    //     for _ in 0..N {
     //         test::black_box(p = p1 - p2);
     //     }
     //     hash64(&9238u64);
@@ -145,9 +145,9 @@ mod tests {
     //     let point_ran2 = RistrettoPoint::random(&mut rng);
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
 
-    //     let n = 2000;
-    //     let m = (n as f64 * okvs::FACTOR).floor() as u64;
-    //     for j in 0..n {
+    //     let N = 2000;
+    //     let m = (N as f64 * okvs::FACTOR).floor() as u64;
+    //     for j in 0..N {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
     //     let mut enc: Vec<RistrettoPoint> =
@@ -159,9 +159,9 @@ mod tests {
     //     });
     // }
 
-    // fn scalar_fp(s: &Scalar, t: &Scalar, n: usize) {
+    // fn scalar_fp(s: &Scalar, t: &Scalar, N: usize) {
     //     let mut r = Scalar::ZERO;
-    //     for _ in 0..n {
+    //     for _ in 0..N {
     //         r = s.invert();
     //         for _ in 0..40 {
     //             r += r * t;
