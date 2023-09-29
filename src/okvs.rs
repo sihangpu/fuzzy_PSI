@@ -138,7 +138,7 @@ impl OKVS {
                 let piv = self._matrix[row].0 + i;
                 pivots.push(piv);
                 // if the pivot is not one, divide the row to normalize it
-                if self._matrix[row].1 .0[i] != Scalar::ONE {
+                if Scalar::ONE != self._matrix[row].1 .0[i] {
                     let inv = self._matrix[row].1 .0[i].invert();
                     self._matrix[row].1 .0[i] = Scalar::ONE;
                     for j in i + 1..self.kappa as usize {

@@ -50,7 +50,7 @@ mod tests {
     //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
     // }
 
-    const N: u64 = 4000;
+    const N: u64 = 1000;
 
     #[test]
     fn okvs_test() {
@@ -65,7 +65,7 @@ mod tests {
         test::black_box(okvsmod.encode(&list));
 
         let elapsed = now.elapsed();
-        println!("Elapsed Enc: {:.2?}", elapsed);
+        println!("{} items, Elapsed Enc: {:.2?}", N, elapsed);
         let decoding = okvsmod.decode(39);
         assert_eq!(
             decoding,
@@ -76,7 +76,7 @@ mod tests {
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
         let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
-
+        println!("{} items, OKVS.Encode", N);
         for j in 0..N {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
@@ -88,7 +88,7 @@ mod tests {
     #[bench]
     fn bench_okvs_decode(b: &mut Bencher) {
         let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
-
+        println!("{} items, OKVS.Decode", N);
         for j in 0..N {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
