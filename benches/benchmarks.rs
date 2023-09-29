@@ -37,6 +37,7 @@ mod tests {
     //     println!("h1: {:x}", h1);
     //     assert_eq!(h1, h1c);
     // }
+    //
     // #[test]
     // fn gbf_test() {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
