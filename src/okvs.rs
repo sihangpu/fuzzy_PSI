@@ -1,6 +1,6 @@
 const EPSILON: f64 = 0.15;
 const STAT_BITS: u64 = 40;
-pub const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
+const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
 const HASH_SEED: u64 = 0x1234567890abcdef;
 
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
@@ -13,13 +13,6 @@ use rand::rngs::OsRng;
 use std::collections::HashMap;
 
 type Point = RistrettoPoint;
-// type Point = i64;
-
-// fn random_ind(l: usize) -> usize {
-//     let mut rng = OsRng;
-//     let index = rng.gen_range(0..l);
-//     return index;
-// }
 
 pub struct GBF {
     data: Vec<Point>,
