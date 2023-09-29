@@ -1,9 +1,6 @@
 const EPSILON: f64 = 0.15;
 const STAT_BITS: u64 = 40;
 pub const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
-// const STAT_MASK: u64 = (1 << STAT_BITS) - 1;
-// const POS_MASK: u64 = 1 << (STAT_BITS - 1);
-
 const HASH_SEED: u64 = 0x1234567890abcdef;
 
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
@@ -13,8 +10,6 @@ use curve25519_dalek::Scalar;
 
 use fxhash::hash64;
 use rand::rngs::OsRng;
-// use rand::Rng;
-use core::usize::MAX;
 use std::collections::HashMap;
 
 type Point = RistrettoPoint;
@@ -93,9 +88,9 @@ impl GBF {
 }
 
 pub struct OKVS {
-    data: Vec<Point>,
-    _data: Vec<Scalar>,
-    _matrix: Vec<(usize, (Vec<Scalar>, Scalar))>,
+    data: Vec<(Point, Point)>,
+    _data: Vec<(Scalar, Scalar)>,
+    _matrix: Vec<(usize, (Vec<Scalar>, (Scalar, Scalar)))>,
     m: u64,
     n: u64,
     kappa: u64,
@@ -104,7 +99,10 @@ pub struct OKVS {
 impl OKVS {
     pub fn new(num_item: u64) -> Self {
         let m: u64 = (num_item as f64 * (1.0 + EPSILON)).ceil() as u64;
-        let _data: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut OsRng)).collect();
+        let _data: Vec<(Scalar, Scalar)> = (0..m)
+            .map(|_| (Scalar::ZERO, Scalar::ZERO))
+            // .map(|_| (Scalar::random(&mut OsRng), Scalar::random(&mut OsRng)))
+            .collect();
         return OKVS {
             data: Vec::with_capacity(m as usize),
             _data,
@@ -125,7 +123,7 @@ impl OKVS {
         return self.epsilon;
     }
 
-    pub fn encode(&mut self, list: &HashMap<u64, Scalar>) {
+    pub fn encode(&mut self, list: &HashMap<u64, (Scalar, Scalar)>) {
         let mut pivots: Vec<usize> = Vec::with_capacity(self.n as usize);
         let pos_band_range: u64 = self.m - self.kappa;
         for (&key, &value) in list.iter() {
@@ -153,11 +151,12 @@ impl OKVS {
                     for j in i + 1..self.kappa as usize {
                         self._matrix[row].1 .0[j] *= inv;
                     }
-                    self._matrix[row].1 .1 *= inv;
+                    self._matrix[row].1 .1 .0 *= inv;
+                    self._matrix[row].1 .1 .1 *= inv;
                 }
                 // update the band from the following rows
                 for j in row + 1..self.n as usize {
-                    let (pos, (band, value)) = &self._matrix[j];
+                    let (pos, (band, _)) = &self._matrix[j];
                     // skip if the position is out of range
                     if *pos > piv {
                         continue;
@@ -166,21 +165,26 @@ impl OKVS {
                     let under_pivot = piv - *pos;
                     let multplier = band[under_pivot];
                     let mut tem_scalar;
+                    let tem_scalar2;
                     if Scalar::ZERO != multplier {
                         if Scalar::ONE != multplier {
                             for k in i + 1..self.kappa as usize {
                                 tem_scalar = self._matrix[row].1 .0[k] * multplier;
                                 self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
                             }
-                            tem_scalar = self._matrix[row].1 .1 * multplier;
-                            self._matrix[j].1 .1 -= tem_scalar;
+                            tem_scalar = self._matrix[row].1 .1 .0 * multplier;
+                            tem_scalar2 = self._matrix[row].1 .1 .1 * multplier;
+                            self._matrix[j].1 .1 .0 -= tem_scalar;
+                            self._matrix[j].1 .1 .1 -= tem_scalar2;
                         } else {
                             for k in i + 1..self.kappa as usize {
                                 tem_scalar = self._matrix[row].1 .0[k] * multplier;
                                 self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
                             }
-                            tem_scalar = self._matrix[row].1 .1;
-                            self._matrix[j].1 .1 -= tem_scalar;
+                            tem_scalar = self._matrix[row].1 .1 .0;
+                            tem_scalar2 = self._matrix[row].1 .1 .1;
+                            self._matrix[j].1 .1 .0 -= tem_scalar;
+                            self._matrix[j].1 .1 .1 -= tem_scalar2;
                         }
                     }
                     self._matrix[j].1 .0[under_pivot] = Scalar::ZERO;
@@ -194,7 +198,7 @@ impl OKVS {
         for row in (0..self.n as usize).rev() {
             let (pos, (band, value)) = &self._matrix[row];
             let piv = pivots[row];
-            let mut val = *value;
+            let (mut val, mut val2) = *value;
             for i in 0..self.kappa as usize {
                 if Scalar::ZERO == band[i] {
                     continue;
@@ -202,30 +206,35 @@ impl OKVS {
                 if (i + *pos) == piv {
                     continue;
                 }
-                val -= self._data[i + *pos] * band[i];
+                val -= self._data[i + *pos].0 * band[i];
+                val2 -= self._data[i + *pos].1 * band[i];
             }
-            self._data[piv] = val;
+            self._data[piv] = (val, val2);
         }
         // finalize
         for i in 0..self.m as usize {
-            self.data.push(&self._data[i] * RISTRETTO_BASEPOINT_TABLE);
+            self.data.push((
+                &self._data[i].0 * RISTRETTO_BASEPOINT_TABLE,
+                &self._data[i].1 * RISTRETTO_BASEPOINT_TABLE,
+            ));
         }
         self._matrix.clear();
     }
 
-    pub fn decode(&self, key: u64) -> Point {
+    pub fn decode(&self, key: u64) -> (Point, Point) {
         let pos_band_range: u64 = self.m - self.kappa;
         let seed: u64 = hash64(&(key ^ HASH_SEED));
         let pos: usize = (seed % pos_band_range) as usize;
         let band: Vec<u64> = (0..self.kappa).map(|i| (seed >> i) & 0x01).collect();
 
-        let mut result = Point::identity();
+        let mut result = (Point::identity(), Point::identity());
 
         for i in pos..self.kappa as usize + pos {
             if 0 == band[i - pos] {
                 continue;
             }
-            result += self.data[i];
+            result.0 += self.data[i].0;
+            result.1 += self.data[i].1;
         }
         return result;
     }
