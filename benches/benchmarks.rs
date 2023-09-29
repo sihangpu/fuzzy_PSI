@@ -50,7 +50,7 @@ mod tests {
     //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
     // }
 
-    const N: u64 = 2000;
+    const N: u64 = 4000;
 
     #[test]
     fn okvs_test() {
