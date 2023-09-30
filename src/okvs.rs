@@ -2,6 +2,7 @@ const EPSILON: f64 = 0.15;
 const STAT_BITS: u64 = 40;
 const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
 const HASH_SEED: u64 = 0x1234567890abcdef;
+const KAPPA: u64 = STAT_BITS;
 
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::traits::Identity;
@@ -40,7 +41,7 @@ impl GBF {
         return self.m;
     }
     pub fn num_hashes(&self) -> u64 {
-        return self.kappa;
+        return KAPPA;
     }
     pub fn encode(&mut self, list: &HashMap<u64, Point>) {
         let mut touched: Vec<bool> = vec![false; self.m as usize];
@@ -80,29 +81,44 @@ impl GBF {
     }
 }
 
+pub fn okvs_decode(data: &Vec<(Point, Point)>, key: u64) -> (Point, Point) {
+    let pos_band_range: u64 = data.len() as u64 - KAPPA;
+    let seed: u64 = hash64(&(key ^ HASH_SEED));
+    let pos: usize = (seed % pos_band_range) as usize;
+    let band: Vec<u64> = (0..KAPPA).map(|i| (seed >> i) & 0x01).collect();
+
+    let mut result = (Point::identity(), Point::identity());
+
+    for i in pos..KAPPA as usize + pos {
+        if 0 == band[i - pos] {
+            continue;
+        }
+        result.0 += data[i].0;
+        result.1 += data[i].1;
+    }
+    return result;
+}
 pub struct OKVS {
-    data: Vec<(Point, Point)>,
+    // data: Vec<(Point, Point)>,
     _data: Vec<(Scalar, Scalar)>,
     _matrix: Vec<(usize, (Vec<Scalar>, (Scalar, Scalar)))>,
     m: u64,
     n: u64,
-    kappa: u64,
     epsilon: f64,
 }
 impl OKVS {
     pub fn new(num_item: u64) -> Self {
         let m: u64 = (num_item as f64 * (1.0 + EPSILON)).ceil() as u64;
         let _data: Vec<(Scalar, Scalar)> = (0..m)
-            .map(|_| (Scalar::ZERO, Scalar::ZERO))
-            // .map(|_| (Scalar::random(&mut OsRng), Scalar::random(&mut OsRng)))
+            // .map(|_| (Scalar::ZERO, Scalar::ZERO))
+            .map(|_| (Scalar::random(&mut OsRng), Scalar::random(&mut OsRng)))
             .collect();
         return OKVS {
-            data: Vec::with_capacity(m as usize),
+            // data: Vec::with_capacity(m as usize),
             _data,
             _matrix: Vec::with_capacity(num_item as usize),
             m,
             n: num_item,
-            kappa: STAT_BITS,
             epsilon: EPSILON,
         };
     }
@@ -116,13 +132,23 @@ impl OKVS {
         return self.epsilon;
     }
 
-    pub fn encode(&mut self, list: &HashMap<u64, (Scalar, Scalar)>) {
+    pub fn refresh(&mut self) {
+        self._matrix.clear();
+        self._data.clear();
+        for _ in 0..self.m {
+            self._data
+                .push((Scalar::random(&mut OsRng), Scalar::random(&mut OsRng)));
+        }
+    }
+
+    pub fn encode(&mut self, list: &HashMap<u64, (Scalar, Scalar)>) -> Vec<(Point, Point)> {
+        let mut data: Vec<(Point, Point)> = Vec::with_capacity(self.m as usize);
         let mut pivots: Vec<usize> = Vec::with_capacity(self.n as usize);
-        let pos_band_range: u64 = self.m - self.kappa;
+        let pos_band_range: u64 = self.m - KAPPA;
         for (&key, &value) in list.iter() {
             let seed = hash64(&(key ^ HASH_SEED));
             let hash_pos = (seed % pos_band_range) as usize;
-            let hash_band: Vec<Scalar> = (0..self.kappa)
+            let hash_band: Vec<Scalar> = (0..KAPPA)
                 .map(|i| Scalar::from((seed >> i) & 0x01))
                 .collect();
 
@@ -131,7 +157,7 @@ impl OKVS {
         // sort by position
         self._matrix.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         for row in 0..self.n as usize {
-            for i in 0..self.kappa as usize {
+            for i in 0..KAPPA as usize {
                 if Scalar::ZERO == self._matrix[row].1 .0[i] {
                     continue;
                 }
@@ -141,7 +167,7 @@ impl OKVS {
                 if Scalar::ONE != self._matrix[row].1 .0[i] {
                     let inv = self._matrix[row].1 .0[i].invert();
                     self._matrix[row].1 .0[i] = Scalar::ONE;
-                    for j in i + 1..self.kappa as usize {
+                    for j in i + 1..KAPPA as usize {
                         self._matrix[row].1 .0[j] *= inv;
                     }
                     self._matrix[row].1 .1 .0 *= inv;
@@ -161,7 +187,7 @@ impl OKVS {
                     let tem_scalar2;
                     if Scalar::ZERO != multplier {
                         if Scalar::ONE != multplier {
-                            for k in i + 1..self.kappa as usize {
+                            for k in i + 1..KAPPA as usize {
                                 tem_scalar = self._matrix[row].1 .0[k] * multplier;
                                 self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
                             }
@@ -170,7 +196,7 @@ impl OKVS {
                             self._matrix[j].1 .1 .0 -= tem_scalar;
                             self._matrix[j].1 .1 .1 -= tem_scalar2;
                         } else {
-                            for k in i + 1..self.kappa as usize {
+                            for k in i + 1..KAPPA as usize {
                                 tem_scalar = self._matrix[row].1 .0[k] * multplier;
                                 self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
                             }
@@ -192,7 +218,7 @@ impl OKVS {
             let (pos, (band, value)) = &self._matrix[row];
             let piv = pivots[row];
             let (mut val, mut val2) = *value;
-            for i in 0..self.kappa as usize {
+            for i in 0..KAPPA as usize {
                 if Scalar::ZERO == band[i] {
                     continue;
                 }
@@ -206,29 +232,12 @@ impl OKVS {
         }
         // finalize
         for i in 0..self.m as usize {
-            self.data.push((
+            data.push((
                 &self._data[i].0 * RISTRETTO_BASEPOINT_TABLE,
                 &self._data[i].1 * RISTRETTO_BASEPOINT_TABLE,
             ));
         }
         self._matrix.clear();
-    }
-
-    pub fn decode(&self, key: u64) -> (Point, Point) {
-        let pos_band_range: u64 = self.m - self.kappa;
-        let seed: u64 = hash64(&(key ^ HASH_SEED));
-        let pos: usize = (seed % pos_band_range) as usize;
-        let band: Vec<u64> = (0..self.kappa).map(|i| (seed >> i) & 0x01).collect();
-
-        let mut result = (Point::identity(), Point::identity());
-
-        for i in pos..self.kappa as usize + pos {
-            if 0 == band[i - pos] {
-                continue;
-            }
-            result.0 += self.data[i].0;
-            result.1 += self.data[i].1;
-        }
-        return result;
+        return data;
     }
 }

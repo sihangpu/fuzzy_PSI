@@ -37,21 +37,8 @@ mod tests {
     //     println!("h1: {:x}", h1);
     //     assert_eq!(h1, h1c);
     // }
-    //
-    // #[test]
-    // fn gbf_test() {
-    //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let N = 100;
-    //     for j in 0..N {
-    //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
-    //     }
-    //     let mut gbf = okvs::GBF::new(N);
-    //     gbf.encode(&list);
-    //     let decoding = gbf.decode(12);
-    //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
-    // }
 
-    const N: u64 = 1000;
+    const N: u64 = 2000;
 
     #[test]
     fn okvs_test() {
@@ -63,18 +50,20 @@ mod tests {
 
         let now = Instant::now();
 
-        test::black_box(okvsmod.encode(&list));
+        let data = okvsmod.encode(&list);
 
         let elapsed = now.elapsed();
         println!(
             "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
             N, elapsed
         );
-        let decoding = okvsmod.decode(39);
-        assert_eq!(
-            decoding,
-            (RISTRETTO_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT)
-        );
+        for i in 0..N {
+            let decoding = okvs::okvs_decode(&data, i + 1);
+            assert_eq!(
+                decoding,
+                (RISTRETTO_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT)
+            );
+        }
     }
 
     #[bench]
@@ -97,12 +86,26 @@ mod tests {
             list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
         }
         let mut okvsmod = okvs::OKVS::new(N);
-        okvsmod.encode(&list);
+        let data = okvsmod.encode(&list);
         b.iter(|| {
-            test::black_box(okvsmod.decode(39));
+            test::black_box(okvs::okvs_decode(&data, 39));
         });
     }
 
+    //
+    // #[test]
+    // fn gbf_test() {
+    //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
+    //     let N = 100;
+    //     for j in 0..N {
+    //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
+    //     }
+    //     let mut gbf = okvs::GBF::new(N);
+    //     gbf.encode(&list);
+    //     let decoding = gbf.decode(12);
+    //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
+    // }
+    //
     // #[bench]
     // fn bench_gbf_encode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();

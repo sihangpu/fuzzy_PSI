@@ -10,3 +10,16 @@ edition = "2021"
 curve25519-dalek = {version = "4", features = ["rand_core", "digest", "serde"]}
 rand = "0.8"
 fxhash = "0.2"
+
+
+[profile.release]
+lto = true
+
+[profile.dev]
+lto = true
+opt-level = 3
+codegen-units = 1
+debug = false
+overflow-checks = false
+
+
