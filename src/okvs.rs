@@ -101,7 +101,7 @@ pub fn okvs_decode(data: &Vec<(Point, Point)>, key: u64) -> (Point, Point) {
 pub struct OKVS {
     // data: Vec<(Point, Point)>,
     _data: Vec<(Scalar, Scalar)>,
-    _matrix: Vec<(usize, (Vec<Scalar>, (Scalar, Scalar)))>,
+    _matrix: Vec<(usize, usize, (Vec<Scalar>, (Scalar, Scalar)))>,
     m: u64,
     n: u64,
     epsilon: f64,
@@ -143,7 +143,6 @@ impl OKVS {
 
     pub fn encode(&mut self, list: &HashMap<u64, (Scalar, Scalar)>) -> Vec<(Point, Point)> {
         let mut data: Vec<(Point, Point)> = Vec::with_capacity(self.m as usize);
-        let mut pivots: Vec<usize> = Vec::with_capacity(self.n as usize);
         let pos_band_range: u64 = self.m - KAPPA;
         for (&key, &value) in list.iter() {
             let seed = hash64(&(key ^ HASH_SEED));
@@ -152,83 +151,77 @@ impl OKVS {
                 .map(|i| Scalar::from((seed >> i) & 0x01))
                 .collect();
 
-            self._matrix.push((hash_pos, (hash_band, value)));
+            self._matrix.push((hash_pos, 0usize, (hash_band, value)));
         }
         // sort by position
         self._matrix.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        let mut pivots: usize = 0;
         for row in 0..self.n as usize {
-            for i in 0..KAPPA as usize {
-                if Scalar::ZERO == self._matrix[row].1 .0[i] {
-                    continue;
-                }
-                let piv = self._matrix[row].0 + i;
-                pivots.push(piv);
-                // if the pivot is not one, divide the row to normalize it
-                if Scalar::ONE != self._matrix[row].1 .0[i] {
-                    let inv = self._matrix[row].1 .0[i].invert();
-                    self._matrix[row].1 .0[i] = Scalar::ONE;
-                    for j in i + 1..KAPPA as usize {
-                        self._matrix[row].1 .0[j] *= inv;
-                    }
-                    self._matrix[row].1 .1 .0 *= inv;
-                    self._matrix[row].1 .1 .1 *= inv;
-                }
-                // update the band from the following rows
-                for j in row + 1..self.n as usize {
-                    let (pos, (band, _)) = &self._matrix[j];
-                    // skip if the position is out of range
-                    if *pos > piv {
+            let (top, bot) = self._matrix.split_at_mut(row + 1);
+            if let Some((pos, piv, (band, value))) = top.last_mut() {
+                for i in 0..KAPPA as usize {
+                    if Scalar::ZERO == band[i] {
                         continue;
                     }
-                    // if found the non-zero position, subtract the band
-                    let under_pivot = piv - *pos;
-                    let multplier = band[under_pivot];
-                    let mut tem_scalar;
-                    let tem_scalar2;
-                    if Scalar::ZERO != multplier {
-                        if Scalar::ONE != multplier {
-                            for k in i + 1..KAPPA as usize {
-                                tem_scalar = self._matrix[row].1 .0[k] * multplier;
-                                self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
-                            }
-                            tem_scalar = self._matrix[row].1 .1 .0 * multplier;
-                            tem_scalar2 = self._matrix[row].1 .1 .1 * multplier;
-                            self._matrix[j].1 .1 .0 -= tem_scalar;
-                            self._matrix[j].1 .1 .1 -= tem_scalar2;
-                        } else {
-                            for k in i + 1..KAPPA as usize {
-                                tem_scalar = self._matrix[row].1 .0[k] * multplier;
-                                self._matrix[j].1 .0[under_pivot + k - i] -= tem_scalar;
-                            }
-                            tem_scalar = self._matrix[row].1 .1 .0;
-                            tem_scalar2 = self._matrix[row].1 .1 .1;
-                            self._matrix[j].1 .1 .0 -= tem_scalar;
-                            self._matrix[j].1 .1 .1 -= tem_scalar2;
+                    *piv = *pos + i;
+                    pivots += 1;
+                    // if the pivot is not one, divide the row to normalize it
+                    if Scalar::ONE != band[i] {
+                        let inv = band[i].invert();
+                        band[i] = Scalar::ONE;
+                        for j in i + 1..KAPPA as usize {
+                            band[j] *= inv;
                         }
+                        value.0 *= inv;
+                        value.1 *= inv;
                     }
-                    self._matrix[j].1 .0[under_pivot] = Scalar::ZERO;
+                    // update the band from the following rows
+                    // for j in row + 1..self.n as usize {
+                    for (pos_j, piv_j, (band_j, value_j)) in bot.iter_mut() {
+                        // skip if the position is out of range
+                        if *pos_j > *piv {
+                            continue;
+                        }
+                        // if found the non-zero position, subtract the band
+                        *piv_j = *piv - *pos_j;
+                        let multplier = band_j[*piv_j];
+                        if Scalar::ZERO != multplier {
+                            if Scalar::ONE != multplier {
+                                for k in i + 1..KAPPA as usize {
+                                    band_j[*piv_j + k - i] -= band[k] * multplier;
+                                }
+                                value_j.0 -= value.0 * multplier;
+                                value_j.1 -= value.1 * multplier;
+                            } else {
+                                for k in i + 1..KAPPA as usize {
+                                    band_j[*piv_j + k - i] -= band[k];
+                                }
+                                value_j.0 -= value.0;
+                                value_j.1 -= value.1;
+                            }
+                        }
+                        band_j[*piv_j] = Scalar::ZERO;
+                    }
+                    break;
                 }
-                break;
             }
         }
         // band should not be all-zero
-        assert_eq!(pivots.len(), self.n as usize);
+        assert_eq!(pivots, self.n as usize);
         // back substitution
-        for row in (0..self.n as usize).rev() {
-            let (pos, (band, value)) = &self._matrix[row];
-            let piv = pivots[row];
+        for (pos, piv, (band, value)) in self._matrix.iter().rev() {
             let (mut val, mut val2) = *value;
             for i in 0..KAPPA as usize {
                 if Scalar::ZERO == band[i] {
                     continue;
                 }
-                if (i + *pos) == piv {
+                if (i + *pos) == *piv {
                     continue;
                 }
                 val -= self._data[i + *pos].0 * band[i];
                 val2 -= self._data[i + *pos].1 * band[i];
             }
-            self._data[piv] = (val, val2);
+            self._data[*piv] = (val, val2);
         }
         // finalize
         for i in 0..self.m as usize {
@@ -238,6 +231,7 @@ impl OKVS {
             ));
         }
         self._matrix.clear();
+        self._data.clear();
         return data;
     }
 }

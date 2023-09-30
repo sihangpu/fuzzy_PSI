@@ -6,6 +6,7 @@ extern crate test;
 
 extern crate f_psi;
 use f_psi::okvs;
+use f_psi::psi;
 
 #[cfg(test)]
 mod tests {
@@ -17,6 +18,7 @@ mod tests {
     use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
     use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
     use curve25519_dalek::scalar::Scalar;
+    use curve25519_dalek::traits::Identity;
     use curve25519_dalek::RistrettoPoint;
 
     use fxhash::hash64;
@@ -38,7 +40,7 @@ mod tests {
     //     assert_eq!(h1, h1c);
     // }
 
-    const N: u64 = 2000;
+    const N: u64 = 400;
 
     #[test]
     fn okvs_test() {
@@ -188,9 +190,12 @@ mod tests {
 
     // #[bench]
     // fn bench_scalarmult(b: &mut Bencher) {
-    //     let scalar = Scalar::from(5u64);
+    //     let scalar = Scalar::from(0u64);
     //     b.iter(|| {
-    //         test::black_box(&scalar * &RISTRETTO_BASEPOINT_POINT);
+    //         test::black_box(assert_eq!(
+    //             scalar * &RISTRETTO_BASEPOINT_POINT,
+    //             RistrettoPoint::identity()
+    //         ));
     //     });
     // }
 
