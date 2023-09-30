@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::RistrettoPoint;
@@ -11,10 +9,10 @@ use crate::okvs::OKVS;
 use fxhash::hash64;
 
 const DIM: usize = 2;
-const R: u64 = 5;
+const R: u64 = 30;
 
 const BLK_CELLS: usize = 1 << DIM;
-const SHIFT_ORIGIN: u64 = 2 * R;
+const SIDE_LEN: u64 = 2 * R;
 
 type Point = [u64; DIM];
 type Encoding = Vec<(RistrettoPoint, RistrettoPoint)>;
@@ -25,7 +23,7 @@ fn sample_test_data_points(num: usize) -> Vec<Point> {
     for _ in 0..num {
         let mut point: Point = [0u64; DIM];
         for i in 0..DIM {
-            point[i] = rng.gen_range(SHIFT_ORIGIN..=(1 << 31));
+            point[i] = rng.gen_range(SIDE_LEN..=(1 << 31));
         }
         points.push(point);
     }
@@ -95,7 +93,7 @@ impl Receiver {
         let mut rng = rand::thread_rng();
         self._okvsgen.clear();
         self._pre_data.clear();
-        for i in 0..DIM {
+        for _ in 0..DIM {
             let mut pair = Vec::with_capacity(self.n as usize);
             for _ in 0..self.n {
                 let tem = Scalar::random(&mut rng);
@@ -107,24 +105,28 @@ impl Receiver {
     }
     pub fn msg(&mut self, pt_set: &Vec<Point>) -> Vec<Encoding> {
         let mut result: Vec<Encoding> = Vec::with_capacity(DIM);
+        let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         // for each dimension
         for i in 0..DIM {
-            let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
             // for each receiver's point pt
             for (pt, pre_window) in pt_set
                 .iter()
                 .zip(self._pre_data[i].windows(self.window).step_by(self.window))
             {
-                let blk = block(pt, R << 1, R);
+                let blk = block(pt, SIDE_LEN, R);
                 let key = hash64(&blk);
                 // for each possible value in [2R+1]
+                if pt_set[7][i] == pt[i] {
+                    println!("rec key at  7 : {:?}", blk);
+                }
                 let min = pt[i] - (self.window >> 1) as u64;
                 for (j, pre_val) in pre_window.iter().enumerate() {
                     let key_ij = hash64(&(min + j as u64));
-                    list.insert(key ^ key_ij, *pre_val);
+                    list.push((key ^ key_ij, *pre_val));
                 }
             }
             result.push(self._okvsgen[i].encode(&list));
+            list.clear();
         }
         self._okvsgen.clear();
         self._pre_data.clear();
@@ -135,8 +137,9 @@ impl Receiver {
         let mut count = 0;
         for values in msg_sender.windows(window).step_by(window) {
             for (u, v) in values.iter() {
-                if self.sk * u == *v {
+                if (self.sk * u) == *v {
                     count += 1;
+                    break;
                 }
             }
         }
@@ -174,6 +177,11 @@ impl Sender {
             _coins,
         };
     }
+
+    pub fn get_windowsize(&self) -> usize {
+        return self.window;
+    }
+
     pub fn refresh(&mut self) {
         let mut rng = rand::thread_rng();
         self._coins.clear();
@@ -197,27 +205,31 @@ impl Sender {
             .zip(self._coins.windows(self.window).step_by(self.window))
             .enumerate()
         {
-            let cel = cell(pt, R << 1);
+            let cel = cell(pt, SIDE_LEN);
             // for each possible block
             for (i, coins) in coin_window.iter().enumerate() {
+                let uv_i = ind * self.window + i;
                 for j in 0..DIM {
                     if (i >> j) & 1 == 1 {
-                        blk[j] = cel[j] - R;
+                        blk[j] = cel[j] - 1;
                     } else {
                         blk[j] = cel[j];
                     }
+                }
+                if ind == 9 {
+                    println!("key at {} in {}-blk: {:?}", ind, i, blk);
                 }
                 let key = hash64(&blk);
                 // for each dimension
                 for j in 0..DIM {
                     let key_ij = hash64(&(pt[j] as u64));
                     tem = okvs_decode(&encodings[j], key ^ key_ij);
-                    uv[ind].0 += tem.0;
-                    uv[ind].1 += tem.1;
+                    uv[uv_i].0 += tem.0;
+                    uv[uv_i].1 += tem.1;
                 }
                 // finalize
-                uv[ind].0 = coins.2 * uv[ind].0 + coins.0;
-                uv[ind].1 = coins.2 * uv[ind].1 + coins.1;
+                uv[uv_i].0 = coins.2 * uv[uv_i].0 + coins.0;
+                uv[uv_i].1 = coins.2 * uv[uv_i].1 + coins.1;
             }
         }
         self._coins.clear();
@@ -225,8 +237,31 @@ impl Sender {
     }
 }
 #[test]
-fn main() {
-    println!("2R: 40,  cell: {:?}", cell(&[40, 80], 2 * R));
-    println!("2R: 40,  cell: {:?}", block(&[50, 40], 2 * R, R));
-    println!("{:?}", sample_test_data_points(10));
+fn test_psi_disjoint() {
+    use std::time::Instant;
+    let n = 20;
+    let data_r = sample_test_data_points(n);
+    let mut data_s = sample_test_data_points(n);
+    data_s[9][0] = data_r[7][0] - 15;
+    data_s[9][1] = data_r[7][1] + 15;
+    println!("data_r points: {:?}", data_r[7]);
+    println!("data_s points: {:?}", data_s[9]);
+
+    let mut rec_instance = Receiver::new(n as u64);
+    let mut send_instance = Sender::new(n as u64, rec_instance.publish_pk());
+
+    let now = Instant::now();
+
+    let msg1 = rec_instance.msg(&data_r);
+
+    let elapsed = now.elapsed();
+    println!(
+        "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
+        rec_instance.n * DIM as u64,
+        elapsed
+    );
+
+    let msg2 = send_instance.msg(&msg1, &data_s);
+    let out = rec_instance.output(&msg2, send_instance.get_windowsize());
+    println!("out: {}", out);
 }

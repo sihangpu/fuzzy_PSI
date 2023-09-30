@@ -1,29 +1,45 @@
 #![feature(test)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
+// use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-extern crate test;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
+use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::Identity;
+use curve25519_dalek::RistrettoPoint;
+
+use fxhash::hash64;
+use rand::rngs::OsRng;
 
 extern crate f_psi;
 use f_psi::okvs;
 use f_psi::psi;
 
+// fn bench_okvs_encode(b: &mut Criterion) {
+//     let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
+//     println!("{} items, OKVS.Encode", N);
+//     for j in 0..N {
+//         list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
+//     }
+//     let mut okvs_instance = okvs::OKVS::new(N);
+//     b.bench_function("okvs_encode", |b| {
+//         b.iter(|| {
+//             black_box(okvs_instance.encode(&list));
+//         })
+//     });
+// }
+
+// criterion_group!(benches, bench_okvs_encode);
+// criterion_main!(benches);
+
 #[cfg(test)]
+extern crate test;
 mod tests {
     use super::*;
     use rand::Rng;
     use std::time::Instant;
     use test::Bencher;
-
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-    use curve25519_dalek::scalar::Scalar;
-    use curve25519_dalek::traits::Identity;
-    use curve25519_dalek::RistrettoPoint;
-
-    use fxhash::hash64;
-    use rand::rngs::OsRng;
-    use std::collections::HashMap;
 
     // #[test]
     // fn hash_test() {
@@ -40,13 +56,13 @@ mod tests {
     //     assert_eq!(h1, h1c);
     // }
 
-    const N: u64 = 400;
+    const N: u64 = 1220;
 
     #[test]
     fn okvs_test() {
-        let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
+        let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         for j in 0..N {
-            list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
+            list.push((j + 1, (Scalar::ONE, Scalar::from(100u64) * Scalar::ONE)));
         }
         let mut okvsmod = okvs::OKVS::new(N);
 
@@ -63,17 +79,20 @@ mod tests {
             let decoding = okvs::okvs_decode(&data, i + 1);
             assert_eq!(
                 decoding,
-                (RISTRETTO_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT)
+                (
+                    RISTRETTO_BASEPOINT_POINT,
+                    Scalar::from(100u64) * RISTRETTO_BASEPOINT_POINT
+                )
             );
         }
     }
 
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
-        let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
+        let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         println!("{} items, OKVS.Encode", N);
         for j in 0..N {
-            list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
+            list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
         }
         let mut okvsmod = okvs::OKVS::new(N);
         b.iter(|| {
@@ -82,10 +101,10 @@ mod tests {
     }
     #[bench]
     fn bench_okvs_decode(b: &mut Bencher) {
-        let mut list: HashMap<u64, (Scalar, Scalar)> = HashMap::new();
+        let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         println!("{} items, OKVS.Decode", N);
         for j in 0..N {
-            list.insert(j + 1, (Scalar::ONE, Scalar::ONE));
+            list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
         }
         let mut okvsmod = okvs::OKVS::new(N);
         let data = okvsmod.encode(&list);
@@ -94,7 +113,6 @@ mod tests {
         });
     }
 
-    //
     // #[test]
     // fn gbf_test() {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
@@ -107,7 +125,7 @@ mod tests {
     //     let decoding = gbf.decode(12);
     //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
     // }
-    //
+
     // #[bench]
     // fn bench_gbf_encode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();

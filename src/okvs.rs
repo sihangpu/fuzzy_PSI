@@ -11,7 +11,6 @@ use curve25519_dalek::Scalar;
 
 use fxhash::hash64;
 use rand::rngs::OsRng;
-use std::collections::HashMap;
 
 type Point = RistrettoPoint;
 
@@ -19,19 +18,16 @@ pub struct GBF {
     data: Vec<Point>,
     m: u64,
     n: u64,
-    kappa: u64,
 }
 
 impl GBF {
     pub fn new(num_item: u64) -> Self {
         let m: u64 = (num_item as f64 * FACTOR).floor() as u64;
-        let kappa: u64 = STAT_BITS;
         let data: Vec<Point> = (0..m).map(|_| Point::random(&mut OsRng)).collect();
         return GBF {
             data,
             m,
             n: num_item,
-            kappa,
         };
     }
     pub fn num_items(&self) -> u64 {
@@ -43,15 +39,15 @@ impl GBF {
     pub fn num_hashes(&self) -> u64 {
         return KAPPA;
     }
-    pub fn encode(&mut self, list: &HashMap<u64, Point>) {
+    pub fn encode(&mut self, list: &Vec<(u64, Point)>) {
         let mut touched: Vec<bool> = vec![false; self.m as usize];
         let mut hashkey: [u64; STAT_BITS as usize] = [0u64; STAT_BITS as usize];
-        for (&key, &value) in list.iter() {
-            let seed = hash64(&(key ^ HASH_SEED));
+        for (key, value) in list.iter() {
+            let seed = hash64(&(*key ^ HASH_SEED));
             for i in 0..STAT_BITS {
                 hashkey[i as usize] = hash64(&(seed ^ i)) % self.m;
             }
-            let mut temp = value;
+            let mut temp = *value;
             let mut pos = 0usize;
             for i in 0..STAT_BITS as usize {
                 let j = hashkey[i] as usize;
@@ -141,17 +137,17 @@ impl OKVS {
         }
     }
 
-    pub fn encode(&mut self, list: &HashMap<u64, (Scalar, Scalar)>) -> Vec<(Point, Point)> {
+    pub fn encode(&mut self, list: &Vec<(u64, (Scalar, Scalar))>) -> Vec<(Point, Point)> {
         let mut data: Vec<(Point, Point)> = Vec::with_capacity(self.m as usize);
         let pos_band_range: u64 = self.m - KAPPA;
-        for (&key, &value) in list.iter() {
-            let seed = hash64(&(key ^ HASH_SEED));
+        for (key, value) in list.iter() {
+            let seed = hash64(&(*key ^ HASH_SEED));
             let hash_pos = (seed % pos_band_range) as usize;
             let hash_band: Vec<Scalar> = (0..KAPPA)
                 .map(|i| Scalar::from((seed >> i) & 0x01))
                 .collect();
 
-            self._matrix.push((hash_pos, 0usize, (hash_band, value)));
+            self._matrix.push((hash_pos, 0usize, (hash_band, *value)));
         }
         // sort by position
         self._matrix.sort_unstable_by(|a, b| a.0.cmp(&b.0));
@@ -231,7 +227,37 @@ impl OKVS {
             ));
         }
         self._matrix.clear();
-        self._data.clear();
+        // self._data.clear();
         return data;
+    }
+}
+
+#[test]
+fn okvs_test() {
+    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+    use std::time::Instant;
+
+    let n: u64 = 2000;
+    let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
+    for j in 0..n {
+        list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
+    }
+    let mut okvsmod = OKVS::new(n);
+
+    let now = Instant::now();
+
+    let data = okvsmod.encode(&list);
+
+    let elapsed = now.elapsed();
+    println!(
+        "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
+        n, elapsed
+    );
+    for i in 0..n {
+        let decoding = okvs_decode(&data, i + 1);
+        assert_eq!(
+            decoding,
+            (RISTRETTO_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT)
+        );
     }
 }
