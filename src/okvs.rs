@@ -1,4 +1,4 @@
-const EPSILON: f64 = 0.15;
+const EPSILON: f64 = 0.25;
 const STAT_BITS: u64 = 40;
 const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
 const HASH_SEED: u64 = 0x1234567890abcdef;

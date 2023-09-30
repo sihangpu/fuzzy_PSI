@@ -56,14 +56,15 @@ mod tests {
     //     assert_eq!(h1, h1c);
     // }
 
-    const N: u64 = 1220;
+    const N: u64 = 2000;
 
     #[test]
     fn okvs_test() {
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         for j in 0..N {
-            list.push((j + 1, (Scalar::ONE, Scalar::from(100u64) * Scalar::ONE)));
+            list.push((hash64(&j), (Scalar::ONE, Scalar::from(100u64) * Scalar::ONE)));
         }
+    
         let mut okvsmod = okvs::OKVS::new(N);
 
         let now = Instant::now();
@@ -76,7 +77,7 @@ mod tests {
             N, elapsed
         );
         for i in 0..N {
-            let decoding = okvs::okvs_decode(&data, i + 1);
+            let decoding = okvs::okvs_decode(&data, hash64(&i));
             assert_eq!(
                 decoding,
                 (
@@ -92,7 +93,7 @@ mod tests {
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         println!("{} items, OKVS.Encode", N);
         for j in 0..N {
-            list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
+            list.push((hash64(&j), (Scalar::ONE, Scalar::ONE)));
         }
         let mut okvsmod = okvs::OKVS::new(N);
         b.iter(|| {
