@@ -1,28 +1,11 @@
 #![feature(test)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
-// use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 extern crate f_psi;
 use f_psi::okvs;
+use f_psi::protocol;
 use f_psi::psi;
-
-// fn bench_okvs_encode(b: &mut Criterion) {
-//     let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-//     println!("{} items, OkvsGen.Encode", N);
-//     for j in 0..N {
-//         list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
-//     }
-//     let mut okvs_instance = okvs::OkvsGen::new(N);
-//     b.bench_function("okvs_encode", |b| {
-//         b.iter(|| {
-//             black_box(okvs_instance.encode(&list));
-//         })
-//     });
-// }
-
-// criterion_group!(benches, bench_okvs_encode);
-// criterion_main!(benches);
 
 #[cfg(test)]
 extern crate test;
@@ -55,6 +38,71 @@ mod tests {
             points.push(point);
         }
         return points;
+    }
+
+    #[test]
+    fn test_protocol() {
+        let n = 20;
+        let m = 10000;
+        let data_r = sample_test_data_points(n);
+        let mut data_s = sample_test_data_points(m);
+        data_s[9][0] = data_r[7][0] - 15;
+        data_s[9][1] = data_r[7][1] + 15;
+        data_s[11][0] = data_r[7][0] + psi::R;
+        data_s[11][1] = data_r[7][1] - psi::R;
+        let (rcr, sdr) = protocol::setup(n, m);
+        let now = Instant::now();
+        test::black_box(protocol::run_standard(rcr, sdr, data_r, data_s));
+        let elapsed = now.elapsed();
+        println!("Elapsed Time for Protocol: {:.2?}", elapsed);
+    }
+
+    #[test]
+    fn test_psi_disjoint() {
+        let n = 20;
+        let m = 10000;
+        let data_r = sample_test_data_points(n);
+        let mut data_s = sample_test_data_points(m);
+        data_s[9][0] = data_r[7][0] - 15;
+        data_s[9][1] = data_r[7][1] + 15;
+        data_s[11][0] = data_r[7][0] + psi::R;
+        data_s[11][1] = data_r[7][1] - psi::R;
+        // println!("data_r points: {:?}", data_r[7]);
+        // println!("data_s points: {:?}", data_s[9]);
+
+        let mut rec_instance = psi::Receiver::new(n as u64);
+        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk());
+
+        let now = Instant::now();
+        let msg1 = rec_instance.msg(&data_r);
+
+        let elapsed = now.elapsed();
+        println!(
+            "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
+            rec_instance.get_output_size_per_dim() * psi::DIM as u64,
+            elapsed
+        );
+
+        let sendnow = Instant::now();
+        let msg2 = send_instance.msg(&msg1, &data_s);
+
+        let sendelapsed = sendnow.elapsed();
+        println!(
+            "{} items, Elapsed Time for Decoding (optimize=0): {:.2?}",
+            send_instance.get_output_size(),
+            sendelapsed
+        );
+
+        let recnow = Instant::now();
+        let out = rec_instance.output(&msg2, send_instance.get_windowsize());
+        let recoutputelapsed = recnow.elapsed();
+        println!(
+            "{} items, Elapsed Time for Finishing (optimize=0): {:.2?}",
+            send_instance.get_output_size(),
+            recoutputelapsed
+        );
+        println!("Total : {:.2?}", now.elapsed());
+        println!("out: {}", out);
     }
 
     #[test]
@@ -91,54 +139,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_psi_disjoint() {
-        use std::time::Instant;
-        let n = 20;
-        let m = 1000;
-        let data_r = sample_test_data_points(n);
-        let mut data_s = sample_test_data_points(m);
-        data_s[9][0] = data_r[7][0] - 15;
-        data_s[9][1] = data_r[7][1] + 15;
-        data_s[11][0] = data_r[7][0] + psi::R;
-        data_s[11][1] = data_r[7][1] - psi::R;
-        println!("data_r points: {:?}", data_r[7]);
-        println!("data_s points: {:?}", data_s[9]);
-
-        let mut rec_instance = psi::Receiver::new(n as u64);
-        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk());
-
-        let now = Instant::now();
-        let msg1 = rec_instance.msg(&data_r);
-
-        let elapsed = now.elapsed();
-        println!(
-            "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
-            rec_instance.get_output_size_per_dim() * psi::DIM as u64,
-            elapsed
-        );
-
-        let sendnow = Instant::now();
-        let msg2 = send_instance.msg(&msg1, &data_s);
-
-        let sendelapsed = sendnow.elapsed();
-        println!(
-            "{} items, Elapsed Time for Decoding (optimize=0): {:.2?}",
-            send_instance.get_output_size(),
-            sendelapsed
-        );
-
-        let recnow = Instant::now();
-        let out = rec_instance.output(&msg2, send_instance.get_windowsize());
-        let recoutputelapsed = recnow.elapsed();
-        println!(
-            "{} items, Elapsed Time for Finishing (optimize=0): {:.2?}",
-            send_instance.get_output_size(),
-            recoutputelapsed
-        );
-        println!("out: {}", out);
-    }
-
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
@@ -170,6 +170,7 @@ mod tests {
         b.iter(|| okvs::okvs_decode_batch(&data, &keys));
     }
 
+    //----------------- gbf test -----------------
     // #[test]
     // fn gbf_test() {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
@@ -207,7 +208,8 @@ mod tests {
     //         test::black_box(gbf.decode(8));
     //     });
     // }
-
+    //
+    //----------------- elliptic_curve test -----------------
     // fn add_n(
     //     p1: &RistrettoPoint,
     //     p2: &RistrettoPoint,
@@ -285,3 +287,22 @@ mod tests {
     //     });
     // }
 }
+
+//----------------- criterion -----------------
+// use criterion::{black_box, criterion_group, criterion_main, Criterion};
+// fn bench_okvs_encode(b: &mut Criterion) {
+//     let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
+//     println!("{} items, OkvsGen.Encode", N);
+//     for j in 0..N {
+//         list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
+//     }
+//     let mut okvs_instance = okvs::OkvsGen::new(N);
+//     b.bench_function("okvs_encode", |b| {
+//         b.iter(|| {
+//             black_box(okvs_instance.encode(&list));
+//         })
+//     });
+// }
+// criterion_group!(benches, bench_okvs_encode);
+// criterion_main!(benches);
+//----------------- criterion -----------------

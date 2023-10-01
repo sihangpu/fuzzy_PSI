@@ -12,7 +12,8 @@ use curve25519_dalek::Scalar;
 use fxhash::hash64;
 use rand::rngs::OsRng;
 
-pub type Encoding = Vec<(RistrettoPoint, RistrettoPoint)>;
+pub type PointPair = (RistrettoPoint, RistrettoPoint);
+pub type Encoding = Vec<PointPair>;
 
 pub struct GBF {
     data: Vec<RistrettoPoint>,
@@ -78,7 +79,7 @@ impl GBF {
     }
 }
 
-pub fn okvs_decode(data: &Encoding, key: u64) -> (RistrettoPoint, RistrettoPoint) {
+pub fn okvs_decode(data: &Encoding, key: u64) -> PointPair {
     let pos_band_range: u64 = data.len() as u64 - KAPPA;
     let seed: u64 = hash64(&(key ^ HASH_SEED));
     let pos: usize = (seed % pos_band_range) as usize;

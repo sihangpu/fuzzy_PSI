@@ -125,7 +125,16 @@ impl Receiver {
         return result;
     }
 
-    pub fn output(&self, msg_sender: &okvs::Encoding, window: usize) -> i32 {
+    pub fn post_process(&mut self, msg_sender: &[okvs::PointPair; BLK_CELLS]) -> u32 {
+        for (u, v) in msg_sender.iter() {
+            if (self.sk * u) == *v {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    pub fn output(&mut self, msg_sender: &okvs::Encoding, window: usize) -> u32 {
         let mut count = 0;
         for values in msg_sender.windows(window).step_by(window) {
             for (u, v) in values.iter() {
@@ -190,6 +199,44 @@ impl Sender {
             ));
         }
     }
+
+    #[inline]
+    pub fn send_msg_single(
+        &self,
+        encodings: &Vec<okvs::Encoding>,
+        pt: &Point,
+        index: usize,
+    ) -> [okvs::PointPair; BLK_CELLS] {
+        let mut blk: Point = [0u64; DIM];
+        let coin_window = &self._coins[index..index + self.window];
+        let mut uv: [okvs::PointPair; BLK_CELLS] =
+            [(RistrettoPoint::identity(), RistrettoPoint::identity()); BLK_CELLS];
+        let mut tem: okvs::PointPair;
+        let cel = cell(pt, SIDE_LEN);
+        // for each possible block
+        for (i, coins) in coin_window.iter().enumerate() {
+            for j in 0..DIM {
+                if (i >> j) & 1 == 1 {
+                    blk[j] = cel[j] - 1;
+                } else {
+                    blk[j] = cel[j];
+                }
+            }
+            let key = hash64(&blk);
+            // for each dimension
+            for j in 0..DIM {
+                let key_ij = hash64(&(pt[j] as u64));
+                tem = okvs::okvs_decode(&encodings[j], key ^ key_ij);
+                uv[i].0 += tem.0;
+                uv[i].1 += tem.1;
+            }
+            // finalize
+            uv[i].0 = coins.2 * uv[i].0 + coins.0;
+            uv[i].1 = coins.2 * uv[i].1 + coins.1;
+        }
+        return uv;
+    }
+
     pub fn msg(&mut self, encodings: &Vec<okvs::Encoding>, pt_set: &Vec<Point>) -> okvs::Encoding {
         let mut blk: Point = [0u64; DIM];
         let mut uv: okvs::Encoding =
