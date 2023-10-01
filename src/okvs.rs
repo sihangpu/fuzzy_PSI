@@ -12,10 +12,10 @@ use curve25519_dalek::Scalar;
 use fxhash::hash64;
 use rand::rngs::OsRng;
 
-type Point = RistrettoPoint;
+pub type Encoding = Vec<(RistrettoPoint, RistrettoPoint)>;
 
 pub struct GBF {
-    data: Vec<Point>,
+    data: Vec<RistrettoPoint>,
     m: u64,
     n: u64,
 }
@@ -23,7 +23,8 @@ pub struct GBF {
 impl GBF {
     pub fn new(num_item: u64) -> Self {
         let m: u64 = (num_item as f64 * FACTOR).floor() as u64;
-        let data: Vec<Point> = (0..m).map(|_| Point::random(&mut OsRng)).collect();
+        let data: Vec<RistrettoPoint> =
+            (0..m).map(|_| RistrettoPoint::random(&mut OsRng)).collect();
         return GBF {
             data,
             m,
@@ -39,7 +40,7 @@ impl GBF {
     pub fn num_hashes(&self) -> u64 {
         return KAPPA;
     }
-    pub fn encode(&mut self, list: &Vec<(u64, Point)>) {
+    pub fn encode(&mut self, list: &Vec<(u64, RistrettoPoint)>) {
         let mut touched: Vec<bool> = vec![false; self.m as usize];
         let mut hashkey: [u64; STAT_BITS as usize] = [0u64; STAT_BITS as usize];
         for (key, value) in list.iter() {
@@ -62,14 +63,14 @@ impl GBF {
         }
     }
 
-    pub fn decode(&mut self, key: u64) -> Point {
+    pub fn decode(&mut self, key: u64) -> RistrettoPoint {
         let seed: u64 = hash64(&(key ^ HASH_SEED));
         let mut hashkey = [0u64; STAT_BITS as usize];
         for i in 0..STAT_BITS {
             hashkey[i as usize] = hash64(&(seed ^ i)) % self.m;
         }
 
-        let mut result = Point::identity();
+        let mut result = RistrettoPoint::identity();
         for i in 0..STAT_BITS as usize {
             result += self.data[hashkey[i] as usize];
         }
@@ -77,13 +78,13 @@ impl GBF {
     }
 }
 
-pub fn okvs_decode(data: &Vec<(Point, Point)>, key: u64) -> (Point, Point) {
+pub fn okvs_decode(data: &Encoding, key: u64) -> (RistrettoPoint, RistrettoPoint) {
     let pos_band_range: u64 = data.len() as u64 - KAPPA;
     let seed: u64 = hash64(&(key ^ HASH_SEED));
     let pos: usize = (seed % pos_band_range) as usize;
     let band: Vec<u64> = (0..KAPPA).map(|i| (seed >> i) & 0x01).collect();
 
-    let mut result = (Point::identity(), Point::identity());
+    let mut result = (RistrettoPoint::identity(), RistrettoPoint::identity());
 
     for i in pos..KAPPA as usize + pos {
         if 0 == band[i - pos] {
@@ -94,23 +95,41 @@ pub fn okvs_decode(data: &Vec<(Point, Point)>, key: u64) -> (Point, Point) {
     }
     return result;
 }
-pub struct OKVS {
-    // data: Vec<(Point, Point)>,
+
+pub fn okvs_decode_batch(data: &Encoding, keys: &Vec<u64>) -> Encoding {
+    let pos_band_range: u64 = data.len() as u64 - KAPPA;
+    let mut result: Encoding = Vec::with_capacity(keys.len());
+    for key in keys {
+        let mut result_p = (RistrettoPoint::identity(), RistrettoPoint::identity());
+        let seed: u64 = hash64(&(key ^ HASH_SEED));
+        let pos: usize = (seed % pos_band_range) as usize;
+        let band: Vec<u64> = (0..KAPPA).map(|i| (seed >> i) & 0x01).collect();
+        for i in pos..KAPPA as usize + pos {
+            if 0 == band[i - pos] {
+                continue;
+            }
+            result_p.0 += data[i].0;
+            result_p.1 += data[i].1;
+        }
+        result.push(result_p);
+    }
+    return result;
+}
+pub struct OkvsGen {
     _data: Vec<(Scalar, Scalar)>,
     _matrix: Vec<(usize, usize, (Vec<Scalar>, (Scalar, Scalar)))>,
     m: u64,
     n: u64,
     epsilon: f64,
 }
-impl OKVS {
+impl OkvsGen {
     pub fn new(num_item: u64) -> Self {
         let m: u64 = (num_item as f64 * (1.0 + EPSILON)).ceil() as u64;
         let _data: Vec<(Scalar, Scalar)> = (0..m)
             // .map(|_| (Scalar::ZERO, Scalar::ZERO))
             .map(|_| (Scalar::random(&mut OsRng), Scalar::random(&mut OsRng)))
             .collect();
-        return OKVS {
-            // data: Vec::with_capacity(m as usize),
+        return OkvsGen {
             _data,
             _matrix: Vec::with_capacity(num_item as usize),
             m,
@@ -137,8 +156,8 @@ impl OKVS {
         }
     }
 
-    pub fn encode(&mut self, list: &Vec<(u64, (Scalar, Scalar))>) -> Vec<(Point, Point)> {
-        let mut data: Vec<(Point, Point)> = Vec::with_capacity(self.m as usize);
+    pub fn encode(&mut self, list: &Vec<(u64, (Scalar, Scalar))>) -> Encoding {
+        let mut data: Encoding = Vec::with_capacity(self.m as usize);
         let pos_band_range: u64 = self.m - KAPPA;
         for (key, value) in list.iter() {
             let seed = hash64(&(*key ^ HASH_SEED));
@@ -229,35 +248,5 @@ impl OKVS {
         self._matrix.clear();
         // self._data.clear();
         return data;
-    }
-}
-
-#[test]
-fn okvs_test() {
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-    use std::time::Instant;
-
-    let n: u64 = 2000;
-    let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-    for j in 0..n {
-        list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
-    }
-    let mut okvsmod = OKVS::new(n);
-
-    let now = Instant::now();
-
-    let data = okvsmod.encode(&list);
-
-    let elapsed = now.elapsed();
-    println!(
-        "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
-        n, elapsed
-    );
-    for i in 0..n {
-        let decoding = okvs_decode(&data, i + 1);
-        assert_eq!(
-            decoding,
-            (RISTRETTO_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT)
-        );
     }
 }
