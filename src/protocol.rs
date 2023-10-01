@@ -1,10 +1,12 @@
 use crate::psi;
 
+use std::sync::mpsc as std_mpsc;
+use std::thread;
 use tokio::sync::mpsc;
 
 pub fn setup(num_n: usize, num_m: usize) -> (psi::Receiver, psi::Sender) {
-    let psi_rec = psi::Receiver::new(num_n as u64);
-    let psi_sed = psi::Sender::new(num_m as u64, psi_rec.publish_pk());
+    let psi_rec = psi::Receiver::new(num_n as u64, false);
+    let psi_sed = psi::Sender::new(num_m as u64, psi_rec.publish_pk(), false);
     return (psi_rec, psi_sed);
 }
 
@@ -44,8 +46,6 @@ pub async fn run_async(
     done_rx.recv().await.expect("Failed to receive done signal");
 }
 
-use std::sync::mpsc as std_mpsc;
-use std::thread;
 pub fn run_standard(
     mut psi_rec: psi::Receiver,
     psi_sed: psi::Sender,

@@ -70,11 +70,11 @@ mod tests {
         // println!("data_r points: {:?}", data_r[7]);
         // println!("data_s points: {:?}", data_s[9]);
 
-        let mut rec_instance = psi::Receiver::new(n as u64);
-        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk());
+        let mut rec_instance = psi::Receiver::new(n as u64, true);
+        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true);
 
         let now = Instant::now();
-        let msg1 = rec_instance.msg(&data_r);
+        let msg1 = rec_instance.msg_apart(&data_r);
 
         let elapsed = now.elapsed();
         println!(
@@ -84,7 +84,7 @@ mod tests {
         );
 
         let sendnow = Instant::now();
-        let msg2 = send_instance.msg(&msg1, &data_s);
+        let msg2 = send_instance.msg_apart(&msg1, &data_s);
 
         let sendelapsed = sendnow.elapsed();
         println!(
@@ -94,7 +94,8 @@ mod tests {
         );
 
         let recnow = Instant::now();
-        let out = rec_instance.output(&msg2, send_instance.get_windowsize());
+        // let out = rec_instance.output(&msg2, send_instance.get_windowsize());
+        let out = rec_instance.output_apart(&msg2);
         let recoutputelapsed = recnow.elapsed();
         println!(
             "{} items, Elapsed Time for Finishing (optimize=0): {:.2?}",
