@@ -1,8 +1,8 @@
-const EPSILON: f64 = 0.25;
+const EPSILON: f64 = 0.5;
 const STAT_BITS: u64 = 40;
 const FACTOR: f64 = STAT_BITS as f64 * 1.44 as f64;
 const HASH_SEED: u64 = 0x1234567890abcdef;
-const KAPPA: u64 = 32;
+const KAPPA: u64 = 40;
 
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::traits::Identity;

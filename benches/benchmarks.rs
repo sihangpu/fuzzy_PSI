@@ -25,8 +25,6 @@ mod tests {
 
     use fxhash::hash64;
 
-    const N: u64 = 2000;
-
     fn sample_test_data_points(num: usize) -> Vec<psi::Point> {
         let mut rng = rand::thread_rng();
         let mut points: Vec<psi::Point> = Vec::with_capacity(num);
@@ -41,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn test_protocol() {
+    fn protocol() {
         let n = 20;
         let m = 100;
         let data_r = sample_test_data_points(n);
@@ -58,7 +56,7 @@ mod tests {
     }
 
     #[test]
-    fn test_protocol_apart() {
+    fn protocol_apart() {
         let n = 20;
         let m = 100;
         let data_r = sample_test_data_points(n);
@@ -75,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn test_protocol_lp() {
+    fn protocol_lp() {
         let n = 20;
         let m = 100;
         let data_r = sample_test_data_points(n);
@@ -92,9 +90,9 @@ mod tests {
     }
 
     #[test]
-    fn test_psi_disjoint() {
+    fn psi_disjoint() {
         let n = 20;
-        let m = 10000;
+        let m = 1000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -142,15 +140,16 @@ mod tests {
 
     #[test]
     fn okvs_test() {
+        let n = 2000 * 40;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-        for j in 0..N {
+        for j in 0..n {
             list.push((
                 hash64(&j),
                 (Scalar::ONE, Scalar::from(100u64) * Scalar::ONE),
             ));
         }
 
-        let mut okvs_instance = okvs::OkvsGen::new(N);
+        let mut okvs_instance = okvs::OkvsGen::new(n);
 
         let now = Instant::now();
 
@@ -159,10 +158,10 @@ mod tests {
         let elapsed = now.elapsed();
         println!(
             "{} items, Elapsed Time for Encoding (optimize=0): {:.2?}",
-            N, elapsed
+            n, elapsed
         );
 
-        for i in 0..N {
+        for i in 0..n {
             let decoding = okvs::okvs_decode(&data, hash64(&i));
             assert_eq!(
                 decoding,
@@ -176,12 +175,13 @@ mod tests {
 
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
+        let n = 100;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-        println!("{} items, OkvsGen.Encode", N);
-        for j in 0..N {
+        println!("{} items, OkvsGen.Encode", n);
+        for j in 0..n {
             list.push((hash64(&j), (Scalar::ONE, Scalar::ONE)));
         }
-        let mut okvsmod = okvs::OkvsGen::new(N);
+        let mut okvsmod = okvs::OkvsGen::new(n);
         b.iter(|| {
             test::black_box(okvsmod.encode(&list));
         });
@@ -194,14 +194,15 @@ mod tests {
     }
     #[bench]
     fn bench_okvs_decode(b: &mut Bencher) {
+        let n = 100;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-        println!("{} items, OkvsGen.Decode", N);
-        for j in 0..N {
+        println!("{} items, OkvsGen.Decode", n);
+        for j in 0..n {
             list.push((hash64(&j), (Scalar::ONE, Scalar::ONE)));
         }
-        let mut okvsmod = okvs::OkvsGen::new(N);
+        let mut okvsmod = okvs::OkvsGen::new(n);
         let data = okvsmod.encode(&list);
-        let keys: Vec<u64> = (0..N).collect();
+        let keys: Vec<u64> = (0..n).collect();
         b.iter(|| okvs::okvs_decode_batch(&data, &keys));
     }
 
@@ -209,11 +210,11 @@ mod tests {
     // #[test]
     // fn gbf_test() {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let N = 100;
-    //     for j in 0..N {
+    //     let n = 100;
+    //     for j in 0..n {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(N);
+    //     let mut gbf = okvs::GBF::new(n);
     //     gbf.encode(&list);
     //     let decoding = gbf.decode(12);
     //     assert_eq!(decoding, RISTRETTO_BASEPOINT_POINT);
@@ -222,11 +223,11 @@ mod tests {
     // #[bench]
     // fn bench_gbf_encode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let N = 2000;
-    //     for j in 0..N {
+    //     let n = 2000;
+    //     for j in 0..n {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(N);
+    //     let mut gbf = okvs::GBF::new(n);
     //     b.iter(|| {
     //         test::black_box(gbf.encode(&list));
     //     });
@@ -234,11 +235,11 @@ mod tests {
     // #[bench]
     // fn bench_gbf_decode(b: &mut Bencher) {
     //     let mut list: HashMap<u64, RistrettoPoint> = HashMap::new();
-    //     let N = 2000;
-    //     for j in 0..N {
+    //     let n = 2000;
+    //     for j in 0..n {
     //         list.insert(j, RISTRETTO_BASEPOINT_POINT);
     //     }
-    //     let mut gbf = okvs::GBF::new(N);
+    //     let mut gbf = okvs::GBF::new(n);
     //     b.iter(|| {
     //         test::black_box(gbf.decode(8));
     //     });
@@ -285,7 +286,7 @@ mod tests {
 
     // fn scalar_fp(s: &Scalar, t: &Scalar) {
     //     let mut r = Scalar::ZERO;
-    //     for _ in 0..N {
+    //     for _ in 0..n {
     //         r = s.invert();
     //         for _ in 0..40 {
     //             r += r * t;
@@ -327,11 +328,11 @@ mod tests {
 // use criterion::{black_box, criterion_group, criterion_main, Criterion};
 // fn bench_okvs_encode(b: &mut Criterion) {
 //     let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
-//     println!("{} items, OkvsGen.Encode", N);
-//     for j in 0..N {
+//     println!("{} items, OkvsGen.Encode", n);
+//     for j in 0..n {
 //         list.push((j + 1, (Scalar::ONE, Scalar::ONE)));
 //     }
-//     let mut okvs_instance = okvs::OkvsGen::new(N);
+//     let mut okvs_instance = okvs::OkvsGen::new(n);
 //     b.bench_function("okvs_encode", |b| {
 //         b.iter(|| {
 //             black_box(okvs_instance.encode(&list));
