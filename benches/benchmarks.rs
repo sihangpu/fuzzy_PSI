@@ -43,16 +43,50 @@ mod tests {
     #[test]
     fn test_protocol() {
         let n = 20;
-        let m = 10000;
+        let m = 100;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
         data_s[9][1] = data_r[7][1] + 15;
         data_s[11][0] = data_r[7][0] + psi::R;
         data_s[11][1] = data_r[7][1] - psi::R;
-        let (rcr, sdr) = protocol::setup(n, m);
+        let (rcr, sdr) = protocol::setup(n, m, false, 0);
         let now = Instant::now();
         test::black_box(protocol::run_standard(rcr, sdr, data_r, data_s));
+        let elapsed = now.elapsed();
+        println!("Elapsed Time for Protocol: {:.2?}", elapsed);
+    }
+
+    #[test]
+    fn test_protocol_apart() {
+        let n = 20;
+        let m = 100;
+        let data_r = sample_test_data_points(n);
+        let mut data_s = sample_test_data_points(m);
+        data_s[9][0] = data_r[7][0] - 15;
+        data_s[9][1] = data_r[7][1] + 15;
+        data_s[11][0] = data_r[7][0] + psi::R;
+        data_s[11][1] = data_r[7][1] - psi::R;
+        let (rcr, sdr) = protocol::setup(n, m, true, 0);
+        let now = Instant::now();
+        test::black_box(protocol::run_standard_apart(rcr, sdr, data_r, data_s));
+        let elapsed = now.elapsed();
+        println!("Elapsed Time for Protocol: {:.2?}", elapsed);
+    }
+
+    #[test]
+    fn test_protocol_lp() {
+        let n = 20;
+        let m = 100;
+        let data_r = sample_test_data_points(n);
+        let mut data_s = sample_test_data_points(m);
+        data_s[9][0] = data_r[7][0] - 15;
+        data_s[9][1] = data_r[7][1] + 15;
+        data_s[11][0] = data_r[7][0] + psi::R;
+        data_s[11][1] = data_r[7][1] - psi::R;
+        let (rcr, sdr) = protocol::setup(n, m, true, 1);
+        let now = Instant::now();
+        test::black_box(protocol::run_standard_lp(rcr, sdr, data_r, data_s, 1));
         let elapsed = now.elapsed();
         println!("Elapsed Time for Protocol: {:.2?}", elapsed);
     }
@@ -71,7 +105,7 @@ mod tests {
         // println!("data_s points: {:?}", data_s[9]);
 
         let mut rec_instance = psi::Receiver::new(n as u64, true);
-        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true);
+        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true, 0);
 
         let now = Instant::now();
         let msg1 = rec_instance.msg_apart(&data_r);
