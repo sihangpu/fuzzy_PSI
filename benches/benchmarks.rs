@@ -17,6 +17,8 @@ mod tests {
     use std::vec;
     use test::Bencher;
 
+    use std::collections::HashSet;
+
     use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
     use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
     use curve25519_dalek::scalar::Scalar;
@@ -58,7 +60,7 @@ mod tests {
     #[test]
     fn protocol_apart() {
         let n = 2000;
-        let m = 1000000;
+        let m = 1000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -75,7 +77,7 @@ mod tests {
     #[test]
     fn protocol_lp() {
         let n = 2000;
-        let m = 1000000;
+        let m = 1000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -90,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn psi_disjoint() {
+    fn psi_lp() {
         let n = 2000;
         let m = 1000000;
         let data_r = sample_test_data_points(n);
@@ -103,10 +105,10 @@ mod tests {
         // println!("data_s points: {:?}", data_s[9]);
 
         let mut rec_instance = psi::Receiver::new(n as u64, true);
-        let mut send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true, 0);
+        let send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true, 2);
 
         let now = Instant::now();
-        let msg1 = rec_instance.msg_apart(&data_r);
+        let msg1 = rec_instance.lp_msg_apart(&data_r, 2);
 
         let elapsed = now.elapsed();
         println!(
@@ -116,8 +118,10 @@ mod tests {
         );
 
         let sendnow = Instant::now();
-        let msg2 = send_instance.msg_apart(&msg1, &data_s);
-
+        let mut msgvec: Vec<(okvs::PointPair, HashSet<u32>)> = Vec::with_capacity(m);
+        for i in 0..m {
+            msgvec.push(send_instance.lp_send_msg_single_apart(&msg1, &data_s[i], i));
+        }
         let sendelapsed = sendnow.elapsed();
         println!(
             "{} items, Elapsed Time for Decoding (optimize=0): {:.2?}",
@@ -125,9 +129,13 @@ mod tests {
             sendelapsed
         );
 
+        let mut c = 0u32;
+
         let recnow = Instant::now();
         // let out = rec_instance.output(&msg2, send_instance.get_windowsize());
-        let out = rec_instance.output_apart(&msg2);
+        for i in 0..m {
+            c += rec_instance.lp_post_process(&msgvec[i]);
+        }
         let recoutputelapsed = recnow.elapsed();
         println!(
             "{} items, Elapsed Time for Finishing (optimize=0): {:.2?}",
@@ -135,7 +143,7 @@ mod tests {
             recoutputelapsed
         );
         println!("Total : {:.2?}", now.elapsed());
-        println!("out: {}", out);
+        println!("out: {}", c);
     }
 
     #[test]
@@ -172,7 +180,7 @@ mod tests {
             );
         }
     }
-   
+
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
         let n = 2000;
