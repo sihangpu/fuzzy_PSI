@@ -10,15 +10,7 @@ edition = "2021"
 curve25519-dalek = {version = "4", features = ["rand_core", "digest", "serde"]}
 rand = "0.8"
 fxhash = "0.2"
-tokio = { version = "1", features = ["full"] }
-
-# [dev-dependencies]
-# criterion = { version = "0.5", features = ["html_reports"] }
-# 
-
-[[bench]]
-name = "benchmarks"
-harness = true
+blake3 = "1.5.0"
 
 [[test]]
 name = "tests"

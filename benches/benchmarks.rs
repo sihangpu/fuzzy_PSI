@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn okvs_test() {
-        let n = 2000 * 40;
+        let n = 2000 * 480;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         for j in 0..n {
             list.push((

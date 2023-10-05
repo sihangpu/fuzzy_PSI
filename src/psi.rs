@@ -294,8 +294,11 @@ impl Receiver {
         return 0;
     }
     #[inline]
-    pub fn lp_post_process(&mut self, msg_sender: &(okvs::PointPair, HashSet<u64>)) -> u32 {
-        let x = hash64(
+    pub fn lp_post_process(
+        &mut self,
+        msg_sender: &(okvs::PointPair, HashSet<blake3::Hash>),
+    ) -> u32 {
+        let x = blake3::hash(
             &(msg_sender.0 .1 - self.sk * msg_sender.0 .0)
                 .compress()
                 .to_bytes(),
@@ -333,7 +336,7 @@ pub struct Sender {
     window: usize,
     pk: RistrettoPoint,
     _coins: Vec<(RistrettoPoint, RistrettoPoint, Scalar)>,
-    _coins_lp_set: Vec<HashSet<u64>>,
+    _coins_lp_set: Vec<HashSet<blake3::Hash>>,
     _coins_lp: Vec<RistrettoPoint>,
 }
 impl Sender {
@@ -349,7 +352,7 @@ impl Sender {
         } else {
             R as usize + 1
         };
-        let mut _coins_lp_set: Vec<HashSet<u64>> = Vec::with_capacity(m as usize);
+        let mut _coins_lp_set: Vec<HashSet<blake3::Hash>> = Vec::with_capacity(m as usize);
         let mut _coins_lp: Vec<RistrettoPoint> = Vec::with_capacity(m as usize);
         for _ in 0..m {
             let a = Scalar::random(&mut rng);
@@ -357,10 +360,10 @@ impl Sender {
             let c = Scalar::random(&mut rng);
             _coins.push((&a * RISTRETTO_BASEPOINT_TABLE, a * pk_rec, b));
             _coins_lp.push(&c * RISTRETTO_BASEPOINT_TABLE);
-            let mut hashtab: HashSet<u64> = HashSet::with_capacity(metric_window);
+            let mut hashtab: HashSet<blake3::Hash> = HashSet::with_capacity(metric_window);
             for i in 0..metric_window as u64 {
                 let g_j = &(c + b * Scalar::from(i)) * RISTRETTO_BASEPOINT_TABLE;
-                hashtab.insert(hash64(&g_j.compress().to_bytes()));
+                hashtab.insert(blake3::hash(&g_j.compress().to_bytes()));
             }
             _coins_lp_set.push(hashtab);
         }
@@ -464,7 +467,7 @@ impl Sender {
         encodings: &Vec<okvs::Encoding>,
         pt: &Point,
         index: usize,
-    ) -> (okvs::PointPair, HashSet<u64>) {
+    ) -> (okvs::PointPair, HashSet<blake3::Hash>) {
         let coins = &self._coins[index];
         let mut uv: okvs::PointPair = (RistrettoPoint::identity(), RistrettoPoint::identity());
         let mut tem: okvs::PointPair;

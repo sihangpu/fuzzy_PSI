@@ -9,11 +9,46 @@ use curve25519_dalek::traits::Identity;
 use curve25519_dalek::RistrettoPoint;
 use curve25519_dalek::Scalar;
 
+// use counting_sort::CountingSort;
 use fxhash::hash64;
 use rand::rngs::OsRng;
 
 pub type PointPair = (RistrettoPoint, RistrettoPoint);
 pub type Encoding = Vec<PointPair>;
+
+pub fn counting_sort<F, T>(arr: &mut Vec<T>, min: usize, max: usize, key: F)
+where
+    F: Fn(&T) -> usize,
+    T: Clone,
+{
+    let mut prefix_sums = {
+        // 1. Initialize the count array with default value 0.
+        let len = max - min;
+        let mut count_arr = Vec::with_capacity(len);
+        count_arr.resize(len, 0);
+
+        // 2. Scan elements to collect counts.
+        for value in arr.iter() {
+            count_arr[key(value)] += 1;
+        }
+
+        // 3. Calculate prefix sum.
+        count_arr
+            .into_iter()
+            .scan(0, |state, x| {
+                *state += x;
+                Some(*state - x)
+            })
+            .collect::<Vec<usize>>()
+    };
+
+    // 4. Use prefix sum as index position of output element.
+    for value in arr.to_vec().iter() {
+        let index = key(value);
+        arr[prefix_sums[index]] = value.clone();
+        prefix_sums[index] += 1;
+    }
+}
 
 pub struct GBF {
     data: Vec<RistrettoPoint>,
@@ -171,6 +206,7 @@ impl OkvsGen {
         }
         // sort by position
         self._matrix.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        // counting_sort(&mut self._matrix, 0usize, pos_band_range as usize, |t| t.0);
         let mut pivots: usize = 0;
         for row in 0..self.n as usize {
             let (top, bot) = self._matrix.split_at_mut(row + 1);
@@ -196,7 +232,7 @@ impl OkvsGen {
                     for (pos_j, piv_j, (band_j, value_j)) in bot.iter_mut() {
                         // skip if the position is out of range
                         if *pos_j > *piv {
-                            continue;
+                            break;
                         }
                         // if found the non-zero position, subtract the band
                         *piv_j = *piv - *pos_j;
