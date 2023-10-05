@@ -108,7 +108,7 @@ pub fn run_standard_lp(
     thread::spawn(move || {
         let mut count = 0u32;
         for msg2 in receiver.iter() {
-            count += psi_rec.lp_post_process(&msg2);
+            count += psi_rec.lp_post_process_apart(&msg2);
         }
         println!("Lp metric {}, count: {}", metric, count);
         done_tx.send(()).expect("Failed to send done signal");

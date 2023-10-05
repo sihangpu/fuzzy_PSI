@@ -9,7 +9,7 @@ use crate::okvs;
 use fxhash::hash64;
 
 pub const DIM: usize = 2;
-pub const R: u64 = 5;
+pub const R: u64 = 20;
 pub const BLK_CELLS: usize = 1 << DIM;
 pub const SIDE_LEN: u64 = 2 * R;
 pub const R_L2: u64 = R * R;
@@ -294,7 +294,7 @@ impl Receiver {
         return 0;
     }
     #[inline]
-    pub fn lp_post_process(&mut self, msg_sender: &(okvs::PointPair, HashSet<u32>)) -> u32 {
+    pub fn lp_post_process_apart(&mut self, msg_sender: &(okvs::PointPair, HashSet<u32>)) -> u32 {
         let x = hash64(
             &(msg_sender.0 .1 - self.sk * msg_sender.0 .0)
                 .compress()

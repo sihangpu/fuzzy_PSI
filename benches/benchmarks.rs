@@ -44,6 +44,7 @@ mod tests {
     fn protocol() {
         let n = 2000;
         let m = 10000;
+        println!("n: {}, m: {}, d:{}, delta:{}", n, m, psi::DIM, psi::R);
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - psi::R / 2;
@@ -61,6 +62,7 @@ mod tests {
     fn protocol_apart() {
         let n = 2000;
         let m = 1000;
+        println!("n: {}, m: {}, d:{}, delta:{}", n, m, psi::DIM, psi::R);
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - psi::R / 2;
@@ -78,6 +80,7 @@ mod tests {
     fn protocol_lp() {
         let n = 2000;
         let m = 1000;
+        println!("n: {}, m: {}, d:{}, delta:{}", n, m, psi::DIM, psi::R);
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - psi::R / 2;
@@ -93,7 +96,7 @@ mod tests {
 
     #[test]
     fn psi_lp() {
-        let n = 2000;
+        let n = 32;
         let m = 1000000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
@@ -101,14 +104,14 @@ mod tests {
         data_s[9][1] = data_r[7][1] + psi::R / 2;
         data_s[11][0] = data_r[7][0] + psi::R;
         data_s[11][1] = data_r[7][1] - psi::R;
-        // println!("data_r points: {:?}", data_r[7]);
-        // println!("data_s points: {:?}", data_s[9]);
+
+        println!("n: {}, m: {}, d:{}, delta:{}", n, m, psi::DIM, psi::R);
 
         let mut rec_instance = psi::Receiver::new(n as u64, true);
-        let send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true, 1);
+        let send_instance = psi::Sender::new(m as u64, rec_instance.publish_pk(), true, 0);
 
         let now = Instant::now();
-        let msg1 = rec_instance.lp_msg_apart(&data_r, 1);
+        let msg1 = rec_instance.msg_apart(&data_r);
 
         let elapsed = now.elapsed();
         println!(
@@ -118,9 +121,9 @@ mod tests {
         );
 
         let sendnow = Instant::now();
-        let mut msgvec: Vec<(okvs::PointPair, HashSet<u32>)> = Vec::with_capacity(m);
+        let mut msgvec: Vec<okvs::PointPair> = Vec::with_capacity(m);
         for i in 0..m {
-            msgvec.push(send_instance.lp_send_msg_single_apart(&msg1, &data_s[i], i));
+            msgvec.push(send_instance.send_msg_single_apart(&msg1, &data_s[i], i));
         }
         let sendelapsed = sendnow.elapsed();
         println!(
@@ -134,7 +137,7 @@ mod tests {
         let recnow = Instant::now();
         // let out = rec_instance.output(&msg2, send_instance.get_windowsize());
         for i in 0..m {
-            c += rec_instance.lp_post_process(&msgvec[i]);
+            c += rec_instance.post_process_apart(&msgvec[i]);
         }
         let recoutputelapsed = recnow.elapsed();
         println!(
