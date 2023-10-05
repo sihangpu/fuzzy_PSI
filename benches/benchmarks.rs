@@ -40,8 +40,8 @@ mod tests {
 
     #[test]
     fn protocol() {
-        let n = 20;
-        let m = 100;
+        let n = 2000;
+        let m = 10000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -57,8 +57,8 @@ mod tests {
 
     #[test]
     fn protocol_apart() {
-        let n = 20;
-        let m = 100;
+        let n = 2000;
+        let m = 1000000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -74,25 +74,25 @@ mod tests {
 
     #[test]
     fn protocol_lp() {
-        let n = 20;
-        let m = 100;
+        let n = 2000;
+        let m = 1000000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
         data_s[9][1] = data_r[7][1] + 15;
         data_s[11][0] = data_r[7][0] + psi::R;
         data_s[11][1] = data_r[7][1] - psi::R;
-        let (rcr, sdr) = protocol::setup(n, m, true, 1);
+        let (rcr, sdr) = protocol::setup(n, m, true, 2);
         let now = Instant::now();
-        test::black_box(protocol::run_standard_lp(rcr, sdr, data_r, data_s, 1));
+        test::black_box(protocol::run_standard_lp(rcr, sdr, data_r, data_s, 2));
         let elapsed = now.elapsed();
         println!("Elapsed Time for Protocol: {:.2?}", elapsed);
     }
 
     #[test]
     fn psi_disjoint() {
-        let n = 20;
-        let m = 1000;
+        let n = 2000;
+        let m = 1000000;
         let data_r = sample_test_data_points(n);
         let mut data_s = sample_test_data_points(m);
         data_s[9][0] = data_r[7][0] - 15;
@@ -172,10 +172,10 @@ mod tests {
             );
         }
     }
-
+   
     #[bench]
     fn bench_okvs_encode(b: &mut Bencher) {
-        let n = 100;
+        let n = 2000;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         println!("{} items, OkvsGen.Encode", n);
         for j in 0..n {
@@ -194,7 +194,7 @@ mod tests {
     }
     #[bench]
     fn bench_okvs_decode(b: &mut Bencher) {
-        let n = 100;
+        let n = 2000;
         let mut list: Vec<(u64, (Scalar, Scalar))> = Vec::new();
         println!("{} items, OkvsGen.Decode", n);
         for j in 0..n {
